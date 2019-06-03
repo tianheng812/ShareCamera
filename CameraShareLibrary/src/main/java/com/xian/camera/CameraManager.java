@@ -13,17 +13,24 @@ import android.view.SurfaceHolder;
 import android.view.TextureView;
 
 
+//import com.libyuv.util.YuvUtil;
+
 import com.xian.camera.enums.CameraFacing;
 import com.xian.camera.enums.CameraStateCode;
 import com.xian.camera.listeners.CameraStatesListener;
 import com.xian.camera.listeners.PreviewCallbackListener;
-import com.xian.camera.utils.CameraUtils;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * Created by Administrator on 201 8/6/20.
+ */
 
 public class CameraManager implements Camera.PreviewCallback, Camera.ErrorCallback {
 
@@ -36,13 +43,17 @@ public class CameraManager implements Camera.PreviewCallback, Camera.ErrorCallba
     private Context mContext;
     private static CameraManager cameraManager;
     private TextureView previewTextureView;
-    private List<CameraStatesListener> mCameraStatesListenerList = new ArrayList<>();
-    private Map<PreviewCallbackListener, DispatchHandler> mPreviewCallbackListenerList = new HashMap<>();
+    private static List<CameraStatesListener> mCameraStatesListenerList = new ArrayList<>();
+    private static Map<PreviewCallbackListener, DispatchHandler> mPreviewCallbackListenerList = new ConcurrentHashMap<>();
+    private static Map<DispatchHandler, MyRunable> runnables = new ConcurrentHashMap<>();
     private Handler initCameraHandler;//初始化摄像头线程
+    private byte[] mBuffer; // 预览缓冲数据，使用可以让底层减少重复创建byte[]，起到重用的作用
+    private int openFailCount = 0;//打开摄像头失败的次数
+    private boolean reopen = false;//打开失败后，是否重新打开
 
     @Override
     public void onError(int error, Camera camera) {
-        Log.e("onPreviewFrameerror", "摄像头错误onError CODE=" + error + "===线程ID=>" + Thread.currentThread().getId());
+        Log.e("onPreviewFrameerror", "摄像头错误onError CODE= " + error + "===线程ID=>" + Thread.currentThread().getId());
         boolean errorHandler = false;
         CameraStateCode stateCode = CameraStateCode.CAMERA_ERROR_UNKNOWN;
         switch (error) {
@@ -56,22 +67,36 @@ public class CameraManager implements Camera.PreviewCallback, Camera.ErrorCallba
         for (CameraStatesListener listener : mCameraStatesListenerList) {
             errorHandler = errorHandler | listener.onCameraStatesChanged(stateCode);
         }
+
+        isOpenCamera = false;
         //如果该事件已经被处理，直接返回
         if (errorHandler) return;
+        openFailCount++;
+
         try {
-            mCamera.stopPreview();
-            mCamera.setPreviewCallback(null);
-            mCamera.setPreviewCallbackWithBuffer(null);
-            mCamera.release();
-            isOpenCamera = false;
-            mCamera = null;
-            Log.i(TAG, "11摄像头开始释放11");
-        } catch (Exception e) {
+            if (mCamera != null)
+                mCamera.reconnect();
+            Log.d(TAG, "摄像头打开报错，重新连接");
+        } catch (IOException e) {
             e.printStackTrace();
         }
-        openCamera(currentCameraId);
-        setPreviewDisplay(previewTextureView);
-        startPreview();
+    }
+
+
+    /**
+     * 延迟打开摄像头
+     */
+    public void delayOpenCamera() {
+        if (initCameraHandler != null) {
+            initCameraHandler.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    openCamera(currentCameraId);
+                    setPreviewDisplay(previewTextureView);
+                    startPreview();
+                }
+            }, (long) (Math.pow(openFailCount, 2) * 60_000));
+        }
     }
 
 
@@ -82,7 +107,6 @@ public class CameraManager implements Camera.PreviewCallback, Camera.ErrorCallba
         }
         return sizes;
     }
-
 
     public void registerCameraStatesListener(CameraStatesListener listener) {
         if (!mCameraStatesListenerList.contains(listener))
@@ -140,6 +164,7 @@ public class CameraManager implements Camera.PreviewCallback, Camera.ErrorCallba
             mPreviewCallbackListenerList.get(previewCallbackListener).getLooper().quit();
         }
         mPreviewCallbackListenerList.clear();
+        runnables.clear();
     }
 
     /**
@@ -151,6 +176,7 @@ public class CameraManager implements Camera.PreviewCallback, Camera.ErrorCallba
         if (mPreviewCallbackListener == null) return;
         Handler dispatchHandler = mPreviewCallbackListenerList.get(mPreviewCallbackListener);
         if (dispatchHandler != null) {
+            runnables.remove(dispatchHandler);
             dispatchHandler.getLooper().quit();
         }
         mPreviewCallbackListenerList.remove(mPreviewCallbackListener);
@@ -158,8 +184,8 @@ public class CameraManager implements Camera.PreviewCallback, Camera.ErrorCallba
 
 
     Map<Camera.Size, byte[]> dispatchSizeMap = new HashMap<>();
-
-    long logFlag = System.currentTimeMillis();//摄像头预览打印log控制
+    static Set<PreviewCallbackListener> listeners;
+    private int size;
 
     /**
      * 摄像头预览数据回调
@@ -169,73 +195,96 @@ public class CameraManager implements Camera.PreviewCallback, Camera.ErrorCallba
      */
     @Override
     public void onPreviewFrame(final byte[] data, final Camera camera) {
-        final boolean printLog;
-
-        if ((System.currentTimeMillis() - logFlag) > 5000) {//每隔2秒打印一次日志
-            printLog = true;
-            logFlag = System.currentTimeMillis();
-        } else {
-            printLog = false;
-        }
-        if (printLog)
-            Log.e("onPreviewFrame", "摄像头预览分辨率：" + previewWidth + "x" + previewHeight);
-        //Log.e("onPreviewFrame","---"+camera.getParameters().getPreviewSize().width+" "+Thread.currentThread().getId());
-        //        camera.addCallbackBuffer(data);
         if (data == null) return;
         this.previewData = data;
-        Set<PreviewCallbackListener> listeners = mPreviewCallbackListenerList.keySet();
-        dispatchSizeMap.clear();
-        synchronized (this) {
-            for (PreviewCallbackListener listener : listeners) {
-                final PreviewCallbackListener temp = listener;
-                DispatchHandler dispatchHandler = mPreviewCallbackListenerList.get(listener);
-                if (dispatchHandler == null) {
-                    mPreviewCallbackListenerList.remove(listener);
-                    continue;
-                }
-                Camera.Size size = dispatchHandler.size;
-                final byte[] dispatchData;
-                final int dispatchWidth;
-                final int dispatchHeight;
-                if (size == null || (this.previewWidth == size.width && this.previewHeight == size.height)) {
-                    dispatchData = data;
-                    dispatchWidth = this.previewWidth;
-                    dispatchHeight = this.previewHeight;
-                } else {
-                    Set<Camera.Size> dispatchSizeSet = dispatchSizeMap.keySet();
-                    byte[] dispatchTemp = null;
-                    for (Camera.Size dispatchSize : dispatchSizeSet) {
-                        if (dispatchSize.width == size.width && dispatchSize.height == size.height) {
-                            dispatchTemp = dispatchSizeMap.get(dispatchSize);
-                            break;
+        openFailCount = 0;//有视频流证明摄像头启动成功
+        try {
+            synchronized (this) {
+                if (listeners == null || size != listeners.size())
+                    listeners = mPreviewCallbackListenerList.keySet();
+                size = listeners.size();
+                dispatchSizeMap.clear();
+                for (PreviewCallbackListener listener : listeners) {
+                    final PreviewCallbackListener temp = listener;
+                    DispatchHandler dispatchHandler = mPreviewCallbackListenerList.get(listener);
+                    if (dispatchHandler == null) {
+                        mPreviewCallbackListenerList.remove(listener);
+                        continue;
+                    }
+                    Camera.Size size = dispatchHandler.size;
+                    final byte[] dispatchData;
+                    final int dispatchWidth;
+                    final int dispatchHeight;
+                    if (size == null || (this.previewWidth == size.width && this.previewHeight == size.height)) {
+                        dispatchData = data;
+                        dispatchWidth = this.previewWidth;
+                        dispatchHeight = this.previewHeight;
+                    } else {
+                        Set<Camera.Size> dispatchSizeSet = dispatchSizeMap.keySet();
+                        byte[] dispatchTemp = null;
+                        for (Camera.Size dispatchSize : dispatchSizeSet) {
+                            if (dispatchSize.width == size.width && dispatchSize.height == size.height) {
+                                dispatchTemp = dispatchSizeMap.get(dispatchSize);
+                                break;
+                            }
                         }
-                    }
-                    if (dispatchTemp == null) {
+                        if (dispatchTemp == null) {
 
-                        dispatchTemp = new byte[size.width * size.height * 3 / 2];
-                        byte[] yuvI420ToNV21 = new byte[dispatchTemp.length];
-                        //YuvUtil.compressYUV(data, previewWidth, previewHeight, dispatchTemp, size.width, size.height, 0, 0, false);
-                        //YuvUtil.yuvI420ToNV21(dispatchTemp, yuvI420ToNV21, size.width, size.height);
-                        dispatchTemp = yuvI420ToNV21;
-                        dispatchSizeMap.put(size, dispatchTemp);
+                            dispatchTemp = new byte[size.width * size.height * 3 / 2];
+                            byte[] yuvI420ToNV21 = new byte[dispatchTemp.length];
+                            //YuvUtil.compressYUV(data, previewWidth, previewHeight, dispatchTemp, size.width, size.height, 0, 0, false);
+                            //YuvUtil.yuvI420ToNV21(dispatchTemp, yuvI420ToNV21, size.width, size.height);
+                            dispatchTemp = yuvI420ToNV21;
+                            dispatchSizeMap.put(size, dispatchTemp);
+                        }
+                        dispatchData = dispatchTemp;
+                        dispatchWidth = size.width;
+                        dispatchHeight = size.height;
                     }
-                    dispatchData = dispatchTemp;
-                    dispatchWidth = size.width;
-                    dispatchHeight = size.height;
+
+                    MyRunable runnable = runnables.get(dispatchHandler);
+                    if (runnable == null) {
+                        runnable = new MyRunable();
+                        runnables.put(dispatchHandler, runnable);
+                    }
+                    runnable.distributePreviewFrame(temp, dispatchData, dispatchWidth, dispatchHeight);
+                    dispatchHandler.post(runnable);
                 }
-                dispatchHandler.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        if (printLog)
-                            Log.e("onPreviewFrame", "此次分发分辨率：" + dispatchWidth + "x" + dispatchHeight + "-->分发对象：" + temp);
-                        temp.onPreviewFrame(dispatchData, dispatchWidth, dispatchHeight);
-                    }
-                });
-
             }
+            if (mCamera != null)
+                mCamera.addCallbackBuffer(data);
+
+        } catch (Throwable throwable) {
+            throwable.printStackTrace();
         }
 
     }
+
+
+    private static class MyRunable implements Runnable {
+
+        private PreviewCallbackListener temp;
+        private byte[] dispatchData;
+        private int dispatchWidth;
+        private int dispatchHeight;
+
+        public void distributePreviewFrame(final PreviewCallbackListener temp, final byte[] dispatchData, final int dispatchWidth, final int dispatchHeight) {
+            this.temp = temp;
+            this.dispatchData = dispatchData;
+            this.dispatchWidth = dispatchWidth;
+            this.dispatchHeight = dispatchHeight;
+        }
+
+        @Override
+        public void run() {
+            try {
+                temp.onPreviewFrame(dispatchData, dispatchWidth, dispatchHeight);
+            } catch (Throwable throwable) {
+                throwable.printStackTrace();
+            }
+        }
+    }
+
 
     /**
      * 获取摄像头管理器
@@ -272,6 +321,7 @@ public class CameraManager implements Camera.PreviewCallback, Camera.ErrorCallba
             mCamera.setPreviewDisplay(holder);
             this.previewTextureView = null;
         } catch (Throwable t) {
+            t.printStackTrace();
         }
     }
 
@@ -292,24 +342,6 @@ public class CameraManager implements Camera.PreviewCallback, Camera.ErrorCallba
         }
     }
 
-
-    /**
-     * 以TextureView方式设置摄像头预览画面
-     *
-     * @param surfaceTexture
-     */
-    public void setPreviewDisplay(SurfaceTexture surfaceTexture) {
-        try {
-            stopPreview();
-            if (mCamera != null && surfaceTexture != null)
-                mCamera.setPreviewTexture(surfaceTexture);
-        } catch (Throwable t) {
-            t.printStackTrace();
-            Log.e("onErroronError", "设置预览异常==" + t.toString());
-        }
-    }
-
-
     /**
      * 拍照
      *
@@ -324,7 +356,6 @@ public class CameraManager implements Camera.PreviewCallback, Camera.ErrorCallba
         } catch (Throwable t) {
             t.printStackTrace();
         }
-
     }
 
     /**
@@ -339,6 +370,7 @@ public class CameraManager implements Camera.PreviewCallback, Camera.ErrorCallba
         try {
             mCamera.takePicture(shutter, raw, postview, jpeg);
         } catch (Throwable t) {
+            t.printStackTrace();
         }
     }
 
@@ -359,17 +391,22 @@ public class CameraManager implements Camera.PreviewCallback, Camera.ErrorCallba
      * 开始摄像头预览
      */
     public void startPreview() {
-        if (mCamera != null) {
-            for (CameraStatesListener listener : mCameraStatesListenerList) {
-                listener.onCameraStatesChanged(CameraStateCode.BEFORE_START_PREVIEW);
+        try {
+            if (mCamera != null) {
+                for (CameraStatesListener listener : mCameraStatesListenerList) {
+                    listener.onCameraStatesChanged(CameraStateCode.BEFORE_START_PREVIEW);
+                }
+                setPreviewCallback();
+                mCamera.startPreview();
+                previewing = true;
+                for (CameraStatesListener listener : mCameraStatesListenerList) {
+                    listener.onCameraStatesChanged(CameraStateCode.AFTER_START_PREVIEW);
+                }
             }
-            setPreviewCallback();
-            mCamera.startPreview();
-            previewing = true;
-            for (CameraStatesListener listener : mCameraStatesListenerList) {
-                listener.onCameraStatesChanged(CameraStateCode.AFTER_START_PREVIEW);
-            }
+        } catch (Throwable throwable) {
+            throwable.printStackTrace();
         }
+
     }
 
     /**
@@ -385,11 +422,7 @@ public class CameraManager implements Camera.PreviewCallback, Camera.ErrorCallba
         }
     }
 
-    /**
-     * 打开摄像头
-     */
     private CameraManager() {
-        openCamera();
     }
 
     /**
@@ -413,7 +446,7 @@ public class CameraManager implements Camera.PreviewCallback, Camera.ErrorCallba
     }
 
     //当前打开的摄像头ID
-    private int currentCameraId = -1;
+    private int currentCameraId = Camera.CameraInfo.CAMERA_FACING_BACK;
 
     /**
      * 打开指定摄像头
@@ -449,7 +482,6 @@ public class CameraManager implements Camera.PreviewCallback, Camera.ErrorCallba
                 }
             }
         }
-
         return isOpenCamera;
     }
 
@@ -459,22 +491,26 @@ public class CameraManager implements Camera.PreviewCallback, Camera.ErrorCallba
         } else {
             currentCameraId = cameraId;
             try {
-                mCamera = Camera.open(cameraId);
-                Camera.Parameters parameters = mCamera.getParameters();
-                Camera.Size propPreviewSize = CameraUtils.getInstance().getPropPreviewSize(parameters.getSupportedPreviewSizes());
+                mCamera = Camera.open(currentCameraId);
+               /* Camera.Parameters parameters = mCamera.getParameters();
+                Camera.Size propPreviewSize = CamParaUtil.getInstance().getPropPreviewSize(parameters.getSupportedPreviewSizes());
                 parameters.setPreviewSize(propPreviewSize.width, propPreviewSize.height);
-                mCamera.setParameters(parameters);
+                mCamera.setParameters(parameters);*/
                 isOpenCamera = true;
                 previewHeight = mCamera.getParameters().getPreviewSize().height;
                 previewWidth = mCamera.getParameters().getPreviewSize().width;
                 mCamera.setErrorCallback(CameraManager.this);
-                mCamera.setDisplayOrientation(getCameraDisplayOrientation());
-                Log.e(TAG, "摄像头启动成功");
-            } catch (Exception e) {
+                mCamera.setDisplayOrientation(90);
+                Log.d(TAG, "摄像头启动成功");
+            } catch (Throwable e) {
                 e.printStackTrace();
                 isOpenCamera = false;
+                Log.e(TAG, "摄像头启动失败 " + mCamera);
                 mCamera = null;
-                Log.e(TAG, "摄像头启动失败");
+                openFailCount++;
+                if (reopen) {
+                    delayOpenCamera();
+                }
             }
         }
     }
@@ -504,14 +540,14 @@ public class CameraManager implements Camera.PreviewCallback, Camera.ErrorCallba
 
     private void setPreviewCallback() {
         try {
-            Camera.Size imageSize = mCamera.getParameters().getPreviewSize();
-            int lineBytes = imageSize.width * ImageFormat.getBitsPerPixel(mCamera.getParameters().getPreviewFormat()) / 8;
+            Camera.Parameters parameters = mCamera.getParameters();
+            Camera.Size imageSize = parameters.getPreviewSize();
             previewWidth = imageSize.width;
             previewHeight = imageSize.height;
-            //mCamera.addCallbackBuffer(new byte[lineBytes * imageSize.height]);
-            //mCamera.addCallbackBuffer(new byte[lineBytes * imageSize.height]);
-            mCamera.setPreviewCallback(this);
-        } catch (Exception e) {
+            mBuffer = new byte[previewWidth * previewHeight * 3 / 2];
+            mCamera.setPreviewCallbackWithBuffer(this);
+            mCamera.addCallbackBuffer(mBuffer);
+        } catch (Throwable e) {
             e.printStackTrace();
         }
     }
@@ -529,6 +565,33 @@ public class CameraManager implements Camera.PreviewCallback, Camera.ErrorCallba
             e.printStackTrace();
             return null;
         }
+    }
+
+
+    /**
+     * 选择合适的FPS
+     *
+     * @param parameters
+     * @param expectedThoudandFps 期望的FPS
+     * @return
+     */
+    private int chooseFixedPreviewFps(Camera.Parameters parameters, int expectedThoudandFps) {
+        List<int[]> supportedFps = parameters.getSupportedPreviewFpsRange();
+        for (int[] entry : supportedFps) {
+            if (entry[0] == entry[1] && entry[0] == expectedThoudandFps) {
+                parameters.setPreviewFpsRange(entry[0], entry[1]);
+                return entry[0];
+            }
+        }
+        int[] temp = new int[2];
+        int guess;
+        parameters.getPreviewFpsRange(temp);
+        if (temp[0] == temp[1]) {
+            guess = temp[0];
+        } else {
+            guess = temp[1] / 2;
+        }
+        return guess;
     }
 
 
@@ -583,7 +646,7 @@ public class CameraManager implements Camera.PreviewCallback, Camera.ErrorCallba
                 }
                 setPreviewDisplay(previewTextureView);
                 startPreview();
-            } catch (Exception e) {
+            } catch (Throwable e) {
                 e.printStackTrace();
                 return false;
             }
@@ -599,20 +662,6 @@ public class CameraManager implements Camera.PreviewCallback, Camera.ErrorCallba
 
     public void setContext(Context context) {
         mContext = context;
-    }
-
-
-    public int getCameraDisplayOrientation() {
-        int degrees = 90;
-        if (mContext != null) {
-            DisplayMetrics dm = mContext.getResources().getDisplayMetrics();
-            int heigth = dm.heightPixels;
-            int width = dm.widthPixels;
-            if (heigth < width) {
-                degrees = 0;
-            }
-        }
-        return degrees;
     }
 
     public int getPreviewWidth() {
@@ -635,13 +684,14 @@ public class CameraManager implements Camera.PreviewCallback, Camera.ErrorCallba
     /**
      * 释放摄像头资源
      */
-    public void releaseCamera() {
+    public synchronized void releaseCamera() {
         try {
             if (mCamera != null) {
                 if (mPreviewCallbackListenerList.size() > 0) {
                     for (CameraStatesListener listener : mCameraStatesListenerList) {
                         listener.onCameraStatesChanged(CameraStateCode.RELEASE_FAIL_EXITS_PRE);
                     }
+                    Log.i(TAG, "摄像头开始释放,返回");
                     return;
                 }
                 for (CameraStatesListener listener : mCameraStatesListenerList) {
@@ -658,7 +708,7 @@ public class CameraManager implements Camera.PreviewCallback, Camera.ErrorCallba
                     listener.onCameraStatesChanged(CameraStateCode.AFTER_RELEASE);
                 }
             }
-        } catch (Exception e) {
+        } catch (Throwable e) {
             e.printStackTrace();
             Log.i(TAG, "摄像头释放异常");
         }

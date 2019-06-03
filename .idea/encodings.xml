@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="Encoding" native2AsciiForPropertiesFiles="true" defaultCharsetForPropertiesFiles="UTF-8">
+    <file url="file://$PROJECT_DIR$/CameraShareLibrary/src/main/java/com/xian/camera/CameraManager.java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/CameraShareLibrary/src/main/java/com/xian/camera/enums/CameraFacing.java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/CameraShareLibrary/src/main/java/com/xian/camera/enums/CameraStateCode.java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/CameraShareLibrary/src/main/java/com/xian/camera/listeners" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/CameraShareLibrary/src/main/java/com/xian/camera/listeners/CameraStatesListener.java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/CameraShareLibrary/src/main/java/com/xian/camera/listeners/PreviewCallbackListener.java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/CameraShareLibrary/src/main/java/com/xian/camera/utils" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/CameraShareLibrary/src/main/java/com/xian/camera/utils/CameraUtils.java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/CameraShareLibrary/src/main/java/com/xian/camera/utils/ImageUtils.java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/CameraShareLibrary/src/main/java/com/xian/camera/view/CameraSurfaceView.java" charset="UTF-8" />
+    <file url="PROJECT" charset="UTF-8" />
+  </component>
+</project>

@@ -1,1 +1,1 @@
-include ':app', ':YUVLibrary', ':CameraShareLibrary'
+include ':app',  ':CameraShareLibrary'

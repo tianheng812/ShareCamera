@@ -9,7 +9,6 @@
           <set>
             <option value="$PROJECT_DIR$" />
             <option value="$PROJECT_DIR$/CameraShareLibrary" />
-            <option value="$PROJECT_DIR$/YUVLibrary" />
             <option value="$PROJECT_DIR$/app" />
           </set>
         </option>

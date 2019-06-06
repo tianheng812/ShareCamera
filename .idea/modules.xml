@@ -5,7 +5,6 @@
       <module fileurl="file://$PROJECT_DIR$/CameraShareLibrary/CameraShareLibrary.iml" filepath="$PROJECT_DIR$/CameraShareLibrary/CameraShareLibrary.iml" />
       <module fileurl="file://F:\xian\ShareCamera\YUVLibrary\ModuleYUV.iml" filepath="F:\xian\ShareCamera\YUVLibrary\ModuleYUV.iml" />
       <module fileurl="file://$PROJECT_DIR$/ShareCamera.iml" filepath="$PROJECT_DIR$/ShareCamera.iml" />
-      <module fileurl="file://$PROJECT_DIR$/YUVLibrary/YUVLibrary.iml" filepath="$PROJECT_DIR$/YUVLibrary/YUVLibrary.iml" />
       <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" />
     </modules>
   </component>

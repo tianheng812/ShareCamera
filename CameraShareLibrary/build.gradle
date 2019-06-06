@@ -1,10 +1,8 @@
 apply plugin: 'com.android.library'
 apply plugin: 'com.github.dcendents.android-maven'
-apply plugin: 'com.novoda.bintray-release'
 
 android {
     compileSdkVersion 26
-    buildToolsVersion '26.0.2'
 
     lintOptions {
         abortOnError false
@@ -27,6 +25,12 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
+
+    externalNativeBuild {
+        cmake {
+            path 'CMakeLists.txt'
+        }
+    }
 }
 
 dependencies {
@@ -35,12 +39,3 @@ dependencies {
 }
 
 
-
-publish {
-    userOrg = 'xian'                                  //bintray.com用户名
-    groupId = 'com.xian.camera'                           //jcenter上的路径
-    artifactId = 'CameraShareLibrary'                          //项目名称
-    publishVersion = '1.0.0'                                //版本号
-    desc = 'ShareCamera'
-    website = 'https://github.com/tianheng812/ShareCamera'
-}

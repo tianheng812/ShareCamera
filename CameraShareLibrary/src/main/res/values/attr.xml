@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<resources>
+    <declare-styleable name="share_camera">
+        <attr name="display_orientation" format="integer" />
+        <attr name="camera_id" format="integer" />
+        <attr name="preview_width" format="integer" />
+        <attr name="preview_height" format="integer" />
+        <attr name="preview_mirror" format="boolean" />
+    </declare-styleable>
+</resources>

@@ -5,5 +5,11 @@ package com.xian.camera.listeners;
  */
 
 public interface PreviewCallbackListener {
-    void onPreviewFrame(byte[] data, int previewWidth, int previewHeight);
+    /**
+     * 预览数据回调
+     * @param data 预览数据
+     * @param scaleWidth 要返回缩放后的预览宽度
+     * @param scaleHeight 要返回缩放后预览高度
+     */
+    void onPreviewFrame(byte[] data, int scaleWidth, int scaleHeight);
 }

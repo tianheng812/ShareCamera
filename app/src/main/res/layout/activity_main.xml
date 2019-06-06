@@ -6,7 +6,7 @@
     android:layout_height="match_parent"
     tools:context="com.xian.sharecamera.MainActivity">
 
-    <com.xian.camera.view.CameraSurfaceView
+    <com.xian.camera.view.CameraFocusView
         android:id="@+id/textureView"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />

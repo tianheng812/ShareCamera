@@ -141,7 +141,7 @@ void I420ToNV21(jbyte *src_i420_data, jint width, jint height, jbyte *src_nv21_d
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_libyuv_util_YuvUtil_compressYUV(JNIEnv *env, jclass type,
+Java_com_xian_camera_utils_YuvUtil_compressYUV(JNIEnv *env, jclass type,
                                          jbyteArray src_, jint width,
                                          jint height, jbyteArray dst_,
                                          jint dst_width, jint dst_height,
@@ -174,7 +174,7 @@ Java_com_libyuv_util_YuvUtil_compressYUV(JNIEnv *env, jclass type,
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_libyuv_util_YuvUtil_cropYUV(JNIEnv *env, jclass type, jbyteArray src_, jint width,
+Java_com_xian_camera_utils_YuvUtil_cropYUV(JNIEnv *env, jclass type, jbyteArray src_, jint width,
                                      jint height, jbyteArray dst_, jint dst_width, jint dst_height,
                                      jint left, jint top) {
     //裁剪的区域大小不对
@@ -214,7 +214,7 @@ Java_com_libyuv_util_YuvUtil_cropYUV(JNIEnv *env, jclass type, jbyteArray src_, 
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_libyuv_util_YuvUtil_yuvI420ToNV21(JNIEnv *env, jclass type, jbyteArray i420Src,
+Java_com_xian_camera_utils_YuvUtil_yuvI420ToNV21(JNIEnv *env, jclass type, jbyteArray i420Src,
                                            jbyteArray nv21Src,
                                            jint width, jint height) {
 
@@ -247,7 +247,7 @@ Java_com_libyuv_util_YuvUtil_yuvI420ToNV21(JNIEnv *env, jclass type, jbyteArray 
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_libyuv_util_YuvUtil_cropNV21(JNIEnv *env, jclass type, jbyteArray src_, jint width,
+Java_com_xian_camera_utils_YuvUtil_cropNV21(JNIEnv *env, jclass type, jbyteArray src_, jint width,
                                      jint height, jbyteArray dst_, jint dst_width, jint dst_height,
                                      jint left, jint top) {
     //裁剪的区域大小不对
@@ -291,7 +291,7 @@ Java_com_libyuv_util_YuvUtil_cropNV21(JNIEnv *env, jclass type, jbyteArray src_,
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_libyuv_util_YuvUtil_NV21ToYuvI420(JNIEnv *env, jclass type, jbyteArray nv21Src,
+Java_com_xian_camera_utils_YuvUtil_NV21ToYuvI420(JNIEnv *env, jclass type, jbyteArray nv21Src,
                                            jbyteArray i420Src,
                                            jint width, jint height) {
 

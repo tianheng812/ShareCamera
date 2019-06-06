@@ -35,7 +35,7 @@ dependencies {
     implementation 'com.android.support.constraint:constraint-layout:1.0.2'
 
     implementation project(':CameraShareLibrary')
-    //implementation 'com.github.tianheng812:ShareCamera:V1.0'
+
 }
 
 

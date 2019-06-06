@@ -316,4 +316,46 @@ public class ImageUtils {
         return returnBm;
     }
 
+
+    /**
+     * 从预览图中提取图片
+     *
+     * @param data yuv数据
+     * @param width 宽
+     * @param height 高
+     * @return 图片
+     */
+    public static Bitmap yuvToBitMap(byte[] data, int width,int height,int degree) {
+        try {
+            YuvImage image = new YuvImage(data, ImageFormat.NV21, width,height, null);
+            if (image != null) {
+                ByteArrayOutputStream stream = new ByteArrayOutputStream();
+                image.compressToJpeg(new Rect(0, 0, width, height), 80, stream);
+                Bitmap bmp = BitmapFactory.decodeByteArray(stream.toByteArray(), 0, stream.size());
+
+                //因为图片会放生旋转，因此要对图片进行旋转到和手机在一个方向上
+                Bitmap returnBitmap = rotateCameraBitmap(bmp,degree);
+                if (bmp != null && !bmp.isRecycled()) {
+                    bmp.recycle();
+                }
+                stream.close();
+                return returnBitmap;
+            }
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+        return null;
+    }
+
+    public static Bitmap rotateCameraBitmap(Bitmap bmp,int degree) {
+        if (bmp == null) return null;
+        Matrix matrix = new Matrix();
+        matrix.postRotate(degree);
+        Bitmap newBmp = Bitmap.createBitmap(bmp, 0, 0, bmp.getWidth(), bmp.getHeight(), matrix, true);
+        if (!bmp.isRecycled()) {
+            bmp.recycle();
+        }
+        return newBmp;
+    }
+
 }

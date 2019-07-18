@@ -1,6 +1,7 @@
 package com.xian.camera.view;
 
 import android.content.Context;
+import android.content.res.TypedArray;
 import android.hardware.Camera;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
@@ -8,6 +9,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 
+import com.gdsayee.camera_share.R;
 import com.xian.camera.CameraManager;
 
 /**
@@ -16,6 +18,11 @@ import com.xian.camera.CameraManager;
 
 public class CameraFocusView extends FrameLayout implements View.OnTouchListener {
 
+    private int cameraId;//前后摄像头
+    private int orientation;//预览角度
+    private int previewWidth;//预览的宽度
+    private int previewHeight;//预览的高度
+    private boolean mirror;//镜像
     private FocusCirceView focusCirceView;
     private CameraSurfaceView cameraSurfaceView;
 
@@ -29,8 +36,23 @@ public class CameraFocusView extends FrameLayout implements View.OnTouchListener
 
     public CameraFocusView(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
+
+        TypedArray a = context.obtainStyledAttributes(attrs, R.styleable.share_camera);
+        //获取对应的属性值
+        this.cameraId = a.getInt(R.styleable.share_camera_camera_id, 0);
+        this.orientation = a.getInt(R.styleable.share_camera_display_orientation, 90);
+        this.previewWidth = a.getInt(R.styleable.share_camera_preview_width, 0);
+        this.previewHeight = a.getInt(R.styleable.share_camera_preview_height, 0);
+        this.mirror = a.getBoolean(R.styleable.share_camera_preview_mirror, false);
+
         focusCirceView = new FocusCirceView(context);
         cameraSurfaceView = new CameraSurfaceView(context);
+        cameraSurfaceView.setMirror(mirror);
+        cameraSurfaceView.setCameraId(cameraId);
+        cameraSurfaceView.setOrientation(orientation);
+        cameraSurfaceView.setPreviewWidth(previewWidth);
+        cameraSurfaceView.setPreviewHeight(previewHeight);
+
         setOnTouchListener(this);
         addView(cameraSurfaceView, new
                 ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,

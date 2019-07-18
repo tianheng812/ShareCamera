@@ -2,11 +2,12 @@ package com.xian.sharecamera
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.graphics.BitmapFactory
+import android.graphics.*
 import android.hardware.Camera
 import android.os.Build
 import android.support.v7.app.AppCompatActivity
 import android.os.Bundle
+import android.os.Environment
 import android.support.v4.app.ActivityCompat
 import android.support.v4.content.ContextCompat
 import android.view.View
@@ -17,7 +18,7 @@ import android.widget.Toast
 import com.xian.camera.CameraManager
 import com.xian.camera.listeners.PreviewCallbackListener
 import com.xian.camera.utils.ImageUtils
-import com.xian.camera.utils.LogUtils
+import com.xian.camera.utils.YuvUtil
 import com.xian.camera.view.CameraFocusView
 
 class MainActivity : AppCompatActivity() {
@@ -32,7 +33,6 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         iv_takePicture = findViewById(R.id.iv_takePicture);
-        cameraFocusView = findViewById(R.id.textureView)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
@@ -41,14 +41,33 @@ class MainActivity : AppCompatActivity() {
                         100);
             }
         }
+
     }
 
-
+    var islog = true
+    internal var dest = ByteArray(640 * 360 * 3 / 2)
+    internal var dest2 = ByteArray(640 * 360 * 3 / 2)
     var previewCallBackListener = PreviewCallbackListener { data, scaleWidth, scaleHeight ->
         //尽量不要在这里做耗时操作
-        val yuvToBitMap = ImageUtils.yuvToBitMap(data, scaleWidth, scaleHeight,90)
-        LogUtils.d("图片的宽度：" + yuvToBitMap.width + " --高度--> " + yuvToBitMap.height)
+        /*val yuvToBitMap = ImageUtils.yuvToBitMap(data, scaleWidth, scaleHeight, 90)
+        // LogUtils.d("图片的宽度：" + yuvToBitMap.width + " --高度--> " + yuvToBitMap.height)
+        if (!islog) {
+            islog=true
+            saveImage(data, scaleWidth, scaleHeight)
+        }*/
+        if (islog) {//裁剪数据
+            islog = false
+            YuvUtil.cropNV21(data, scaleWidth, scaleHeight, dest, 640, 360, 640, 360)
+            YuvUtil.yuvI420ToNV21(dest, dest2, 640, 360)
+
+            val saveNv21Image = ImageUtils.saveNv21Image(Environment.getExternalStorageDirectory().absolutePath + "/10.jpg", dest2, 640, 360)
+            runOnUiThread({
+                iv_takePicture.setImageBitmap(saveNv21Image)
+            })
+        }
+
     }
+
 
     /**
      * 拍照
@@ -68,7 +87,10 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         //注： 如何想返回和预览尺寸一样大的，请使用CameraManager.getInstance().registerPreviewCallbackListener(previewCallBackListener)
-        CameraManager.getInstance().registerPreviewCallbackListener(previewCallBackListener, 640, 480)
+        CameraManager.getInstance().registerPreviewCallbackListener(previewCallBackListener, 1920, 1080)
+        if (!CameraManager.getInstance().isPreviewing) {
+            CameraManager.getInstance().startPreview()
+        }
     }
 
     override fun onStop() {

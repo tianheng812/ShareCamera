@@ -20,8 +20,8 @@ JNIEXPORT void JNI_OnUnload(JavaVM *jvm, void *reserved) {
 
 void init(jint width, jint height, jint dst_width, jint dst_height) {
     Src_i420_data = (jbyte *) malloc(sizeof(jbyte) * width * height * 3 / 2);
-    //Src_i420_data_scale = (jbyte *) malloc(sizeof(jbyte) * dst_width * dst_height * 3 / 2);
-    //Src_i420_data_rotate = (jbyte *) malloc(sizeof(jbyte) * dst_width * dst_height * 3 / 2);
+    Src_i420_data_scale = (jbyte *) malloc(sizeof(jbyte) * dst_width * dst_height * 3 / 2);
+    Src_i420_data_rotate = (jbyte *) malloc(sizeof(jbyte) * dst_width * dst_height * 3 / 2);
 }
 
 void scaleI420(jbyte *src_i420_data, jint width, jint height, jbyte *dst_i420_data, jint dst_width,
@@ -72,6 +72,15 @@ void rotateI420(jbyte *src_i420_data, jint width, jint height, jbyte *dst_i420_d
                            (uint8 *) dst_i420_v_data, height >> 1,
                            width, height,
                            (libyuv::RotationMode) degree);
+    } else {
+        libyuv::I420Rotate((const uint8 *) src_i420_y_data, width,
+                           (const uint8 *) src_i420_u_data, width >> 1,
+                           (const uint8 *) src_i420_v_data, width >> 1,
+                           (uint8 *) dst_i420_y_data, width,
+                           (uint8 *) dst_i420_u_data, width >> 1,
+                           (uint8 *) dst_i420_v_data, width >> 1,
+                           width, height,
+                           (libyuv::RotationMode) degree);
     }
 }
 
@@ -118,7 +127,7 @@ void nv21ToI420(jbyte *src_nv21_data, jint width, jint height, jbyte *src_i420_d
 }
 
 
-void I420ToNV21(jbyte *src_i420_data, jint width, jint height, jbyte *src_nv21_data){
+void I420ToNV21(jbyte *src_i420_data, jint width, jint height, jbyte *src_nv21_data) {
     int src_y_size = width * height;
     jint src_u_size = (width >> 1) * (height >> 1);
 
@@ -142,11 +151,11 @@ void I420ToNV21(jbyte *src_i420_data, jint width, jint height, jbyte *src_nv21_d
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_xian_camera_utils_YuvUtil_compressYUV(JNIEnv *env, jclass type,
-                                         jbyteArray src_, jint width,
-                                         jint height, jbyteArray dst_,
-                                         jint dst_width, jint dst_height,
-                                         jint mode, jint degree,
-                                         jboolean isMirror) {
+                                               jbyteArray src_, jint width,
+                                               jint height, jbyteArray dst_,
+                                               jint dst_width, jint dst_height,
+                                               jint mode, jint degree,
+                                               jboolean isMirror) {
     //为中间操作需要的分配空间
     init(width, height, dst_width, dst_height);
     jbyte *Src_data = env->GetByteArrayElements(src_, NULL);
@@ -156,27 +165,31 @@ Java_com_xian_camera_utils_YuvUtil_compressYUV(JNIEnv *env, jclass type,
     //进行缩放的操作
     scaleI420(Src_i420_data, width, height, Dst_data, dst_width, dst_height, mode);
 
-    free(Src_i420_data);
-   // LOGI("111111111212222222222222222222")
-    env->ReleaseByteArrayElements(src_,Src_data,0);
-    env->ReleaseByteArrayElements(dst_,Dst_data,0);
-
-    /* if (isMirror) {
-         //进行旋转的操作
-         rotateI420(Src_i420_data_scale, dst_width, dst_height, Src_i420_data_rotate, degree);
-         //因为旋转的角度都是90和270，那后面的数据width和height是相反的
-         mirrorI420(Src_i420_data_rotate, dst_height, dst_width, Dst_data);
-     } else {
+    if (isMirror) {
+        //进行旋转的操作
+        rotateI420(Src_i420_data_scale, dst_width, dst_height, Src_i420_data_rotate, degree);
+        //因为旋转的角度都是90和270，那后面的数据width和height是相反的
+        if (degree == 90 || degree == 270) {
+            mirrorI420(Src_i420_data_rotate, dst_height, dst_width, Dst_data);
+        } else {
+            rotateI420(Src_i420_data_scale, dst_width, dst_height, Dst_data, degree);
+        }
+    } else {
         rotateI420(Src_i420_data_scale, dst_width, dst_height, Dst_data, degree);
-     }
-     env->ReleaseByteArrayElements(dst_, Dst_data, 0);*/
+    }
+    free(Src_i420_data);
+    free(Src_i420_data_scale);
+    free(Src_i420_data_rotate);
+    env->ReleaseByteArrayElements(src_, Src_data, 0);
+    env->ReleaseByteArrayElements(dst_, Dst_data, 0);
 }
 
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_xian_camera_utils_YuvUtil_cropYUV(JNIEnv *env, jclass type, jbyteArray src_, jint width,
-                                     jint height, jbyteArray dst_, jint dst_width, jint dst_height,
-                                     jint left, jint top) {
+                                           jint height, jbyteArray dst_, jint dst_width,
+                                           jint dst_height,
+                                           jint left, jint top) {
     //裁剪的区域大小不对
     if (left + dst_width > width || top + dst_height > height) {
         return;
@@ -215,8 +228,8 @@ Java_com_xian_camera_utils_YuvUtil_cropYUV(JNIEnv *env, jclass type, jbyteArray 
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_xian_camera_utils_YuvUtil_yuvI420ToNV21(JNIEnv *env, jclass type, jbyteArray i420Src,
-                                           jbyteArray nv21Src,
-                                           jint width, jint height) {
+                                                 jbyteArray nv21Src,
+                                                 jint width, jint height) {
 
     jbyte *src_i420_data = env->GetByteArrayElements(i420Src, NULL);
     jbyte *src_nv21_data = env->GetByteArrayElements(nv21Src, NULL);
@@ -240,16 +253,17 @@ Java_com_xian_camera_utils_YuvUtil_yuvI420ToNV21(JNIEnv *env, jclass type, jbyte
             (uint8 *) src_nv21_vu_data, width,
             width, height);
 
-    env->ReleaseByteArrayElements(i420Src,src_i420_data,0);
-    env->ReleaseByteArrayElements(nv21Src,src_nv21_data,0);
+    env->ReleaseByteArrayElements(i420Src, src_i420_data, 0);
+    env->ReleaseByteArrayElements(nv21Src, src_nv21_data, 0);
 }
 
 
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_xian_camera_utils_YuvUtil_cropNV21(JNIEnv *env, jclass type, jbyteArray src_, jint width,
-                                     jint height, jbyteArray dst_, jint dst_width, jint dst_height,
-                                     jint left, jint top) {
+                                            jint height, jbyteArray dst_, jint dst_width,
+                                            jint dst_height,
+                                            jint left, jint top) {
     //裁剪的区域大小不对
     if (left + dst_width > width || top + dst_height > height) {
         return;
@@ -260,10 +274,10 @@ Java_com_xian_camera_utils_YuvUtil_cropNV21(JNIEnv *env, jclass type, jbyteArray
         return;
     }
 
+    jbyte *Src_i420_data = (jbyte *) malloc(sizeof(jbyte) * width * height * 3 / 2);
     jint src_length = env->GetArrayLength(src_);
     jbyte *src_i420_data = env->GetByteArrayElements(src_, NULL);
     jbyte *dst_i420_data = env->GetByteArrayElements(dst_, NULL);
-
 
     nv21ToI420(src_i420_data, width, height, Src_i420_data);
 
@@ -283,7 +297,7 @@ Java_com_xian_camera_utils_YuvUtil_cropNV21(JNIEnv *env, jclass type, jbyteArray
                           dst_width, dst_height,
                           libyuv::kRotate0, libyuv::FOURCC_I420);
 
-
+    free(Src_i420_data);
     env->ReleaseByteArrayElements(src_, src_i420_data, 0);
     env->ReleaseByteArrayElements(dst_, dst_i420_data, 0);
 }
@@ -292,8 +306,8 @@ Java_com_xian_camera_utils_YuvUtil_cropNV21(JNIEnv *env, jclass type, jbyteArray
 extern "C"
 JNIEXPORT void JNICALL
 Java_com_xian_camera_utils_YuvUtil_NV21ToYuvI420(JNIEnv *env, jclass type, jbyteArray nv21Src,
-                                           jbyteArray i420Src,
-                                           jint width, jint height) {
+                                                 jbyteArray i420Src,
+                                                 jint width, jint height) {
 
     jbyte *src_i420_data = env->GetByteArrayElements(i420Src, NULL);
     jbyte *src_nv21_data = env->GetByteArrayElements(nv21Src, NULL);
@@ -316,8 +330,8 @@ Java_com_xian_camera_utils_YuvUtil_NV21ToYuvI420(JNIEnv *env, jclass type, jbyte
                        (uint8 *) src_i420_v_data, width >> 1,
                        width, height);
 
-    env->ReleaseByteArrayElements(i420Src,src_i420_data,0);
-    env->ReleaseByteArrayElements(nv21Src,src_nv21_data,0);
+    env->ReleaseByteArrayElements(i420Src, src_i420_data, 0);
+    env->ReleaseByteArrayElements(nv21Src, src_nv21_data, 0);
 }
 
 

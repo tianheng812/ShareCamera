@@ -6,10 +6,22 @@
     android:layout_height="match_parent"
     tools:context="com.xian.sharecamera.MainActivity">
 
+    <!--
+    camera_id 0后置摄像头，1,前置摄像头
+    display_orientation  角度
+    preview_width  预览的宽度
+    preview_height  预览的高度
+    preview_mirror  是否需要镜像
+    -->
     <com.xian.camera.view.CameraFocusView
         android:id="@+id/textureView"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="match_parent"
+        app:camera_id="1"
+        app:display_orientation="90"
+        app:preview_height="1080"
+        app:preview_mirror="false"
+        app:preview_width="1920" />
 
 
     <ImageView
@@ -17,8 +29,8 @@
         android:layout_width="80dp"
         android:layout_height="100dp"
         android:layout_gravity="bottom"
-        android:layout_marginLeft="10dp"
-        android:layout_marginBottom="10dp"/>
+        android:layout_marginBottom="10dp"
+        android:layout_marginLeft="10dp" />
 
 
     <Button
@@ -28,6 +40,6 @@
         android:layout_gravity="center_horizontal|bottom"
         android:layout_marginBottom="50dp"
         android:background="@drawable/oval_select"
-        android:onClick="onTakePicture"/>
+        android:onClick="onTakePicture" />
 
 </FrameLayout>

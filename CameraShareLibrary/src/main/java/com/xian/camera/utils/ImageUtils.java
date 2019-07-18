@@ -10,6 +10,7 @@ import android.graphics.Rect;
 import android.graphics.YuvImage;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Environment;
 import android.provider.MediaStore;
 import android.renderscript.Allocation;
 import android.renderscript.Element;
@@ -18,6 +19,8 @@ import android.renderscript.ScriptIntrinsicYuvToRGB;
 import android.renderscript.Type;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
@@ -320,21 +323,21 @@ public class ImageUtils {
     /**
      * 从预览图中提取图片
      *
-     * @param data yuv数据
-     * @param width 宽
+     * @param data   yuv数据
+     * @param width  宽
      * @param height 高
      * @return 图片
      */
-    public static Bitmap yuvToBitMap(byte[] data, int width,int height,int degree) {
+    public static Bitmap yuvToBitMap(byte[] data, int width, int height, int degree) {
         try {
-            YuvImage image = new YuvImage(data, ImageFormat.NV21, width,height, null);
+            YuvImage image = new YuvImage(data, ImageFormat.NV21, width, height, null);
             if (image != null) {
                 ByteArrayOutputStream stream = new ByteArrayOutputStream();
                 image.compressToJpeg(new Rect(0, 0, width, height), 80, stream);
                 Bitmap bmp = BitmapFactory.decodeByteArray(stream.toByteArray(), 0, stream.size());
 
                 //因为图片会放生旋转，因此要对图片进行旋转到和手机在一个方向上
-                Bitmap returnBitmap = rotateCameraBitmap(bmp,degree);
+                Bitmap returnBitmap = rotateCameraBitmap(bmp, degree);
                 if (bmp != null && !bmp.isRecycled()) {
                     bmp.recycle();
                 }
@@ -347,7 +350,7 @@ public class ImageUtils {
         return null;
     }
 
-    public static Bitmap rotateCameraBitmap(Bitmap bmp,int degree) {
+    public static Bitmap rotateCameraBitmap(Bitmap bmp, int degree) {
         if (bmp == null) return null;
         Matrix matrix = new Matrix();
         matrix.postRotate(degree);
@@ -357,5 +360,32 @@ public class ImageUtils {
         }
         return newBmp;
     }
+
+
+    /**
+     * 保存nv21数据
+     *
+     * @param path
+     * @param nv21
+     * @param width
+     * @param height
+     * @return
+     */
+    public static Bitmap saveNv21Image(String path, byte[] nv21, int width, int height) {
+        try {
+            YuvImage yuvImage = new YuvImage(nv21, ImageFormat.NV21, width, height, null);
+            //为了美观，扩大rect截取注册图
+            File file = new File(path);
+            FileOutputStream fosImage = new FileOutputStream(file);
+            yuvImage.compressToJpeg(new Rect(0, 0, width, height), 100, fosImage);
+            Bitmap bitmap = BitmapFactory.decodeFile(file.getAbsolutePath());
+            fosImage.close();
+            return bitmap;
+        } catch (Throwable e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
 
 }
